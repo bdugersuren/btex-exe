@@ -18,8 +18,8 @@ echo "✓ Контейнерууд ажиллаж байна:"
 docker compose ps
 
 echo ""
-echo "  Апп   → http://localhost:3000"
-echo "  DB    → localhost:5432"
+echo "  Апп   → http://localhost:88"
 echo ""
 echo "  Лог харах : ./scripts/logs.sh"
+echo "  Nginx лог : ./scripts/logs.sh prod nginx"
 echo "  Зогсоох   : ./scripts/stop.sh"

@@ -25,7 +25,7 @@ cp .env.example .env
 > `tools` нэртэй тусдаа Docker stage дотор ажиллана. Production container-д `npx prisma`
 > гэх мэт команд ажиллуулах оролдлого алдаа өгнө — scripts ашигла.
 
-Апп: **http://localhost:3000**
+Апп: **http://localhost:88** (production), **http://localhost:3000** (dev)
 
 ---
 
@@ -57,11 +57,16 @@ openssl rand -base64 32
 
 ## Орчнууд (Environments)
 
-| Орчин | Compose файл | Dockerfile | Апп container |
+| Орчин | Compose файл | Dockerfile | Гадна порт |
 |---|---|---|---|
-| **Production** | `docker-compose.yml` | `docker/Dockerfile` | `btec_app` |
-| **Dev** | `docker-compose.dev.yml` | `docker/Dockerfile.dev` | `btec_app_dev` |
-| **Prod (тусгай)** | `docker-compose.prod.yml` | `docker/Dockerfile` | `btec_app_prod` |
+| **Production** | `docker-compose.yml` | `docker/Dockerfile` | `88` (Nginx) |
+| **Dev** | `docker-compose.dev.yml` | `docker/Dockerfile.dev` | `3000` (Next.js шууд) |
+
+**Production контейнерууд:**
+- `btec_nginx` — Nginx reverse proxy, гадна порт **88**
+- `btec_app` — Next.js (internal, зөвхөн docker network)
+- `btec_db` — PostgreSQL (internal, гадна порт байхгүй)
+- `btec_redis` — Redis (internal, гадна порт байхгүй)
 
 > Dev орчин нь hot reload, volume mount хийдэг тул кодын өөрчлөлт шууд хэрэгждэг.
 
@@ -239,7 +244,9 @@ docker compose down                        # Зогсоох
 docker compose down -v                     # Зогсоож volume устгах
 docker compose restart app                 # Апп дахин эхлүүлэх
 docker compose logs -f app                 # Апп лог
+docker compose logs -f nginx               # Nginx лог
 docker compose logs -f db                  # DB лог
+docker compose logs -f redis               # Redis лог
 
 # Dev
 docker compose -f docker-compose.dev.yml up -d --build
@@ -371,11 +378,15 @@ docker exec btec_app npx prisma migrate status
 ./scripts/reset-db.sh dev
 ```
 
-### Port 3000 эзэлсэн байвал
+### Port 88 эзэлсэн байвал (production)
 ```bash
-# Ямар процесс ашиглаж байгааг олох
+lsof -i :88
+kill -9 <PID>
+```
+
+### Port 3000 эзэлсэн байвал (dev)
+```bash
 lsof -i :3000
-# Зогсоох
 kill -9 <PID>
 ```
 
@@ -390,19 +401,29 @@ kill -9 <PID>
 ## Системийн архитектур (товч)
 
 ```
-Browser → Next.js (port 3000)
+Browser → Nginx (port 88, production)
+            ↓ reverse proxy, gzip, rate limit
+          Next.js (port 3000, internal)
             ↓ API Routes (/api/*)
           Service Layer
-            ↓ Prisma ORM
-          PostgreSQL (port 5432)
-            
+            ↓ Prisma ORM          ↓ Redis cache
+          PostgreSQL             Redis (Gemini cache)
+
 Storage: /app/storage (Docker volume)
 ```
 
-**Контейнерууд:**
-- `btec_app` / `btec_app_dev` — Next.js апп
-- `btec_db` / `btec_db_dev` — PostgreSQL 15
+**Production контейнерууд:**
+- `btec_nginx` — Nginx (гадна порт 88)
+- `btec_app` — Next.js апп (internal)
+- `btec_db` — PostgreSQL 15 (internal)
+- `btec_redis` — Redis 7 (internal)
+
+**Dev контейнерууд:**
+- `btec_app_dev` — Next.js апп (порт 3000)
+- `btec_db_dev` — PostgreSQL 15 (порт 5433)
+- `btec_redis_dev` — Redis 7 (порт 6380)
 
 **Volumes:**
-- `postgres_data` — DB файлууд
-- `storage_data` — Upload хийгдсэн файлууд
+- `postgres_data` / `postgres_dev_data` — DB файлууд
+- `storage_data` / `storage_dev_data` — Upload хийгдсэн файлууд
+- `redis_data` / `redis_dev_data` — Redis өгөгдөл

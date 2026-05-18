@@ -23,3 +23,24 @@ npm run db:seed
 After the model stabilises, generate a normal migration with `npx prisma migrate dev --name btec_domain_model` and commit `prisma/migrations`.
 
 Uploaded submissions are stored under `storage/` and served through `/api/files/:id` with session-based access checks.
+
+
+
+
+
+```
+
+…or create a new repository on the command line
+echo "# btex-exe" >> README.md
+git init
+git add README.md
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/bdugersuren/btex-exe.git
+git push -u origin main
+…or push an existing repository from the command line
+git remote add origin https://github.com/bdugersuren/btex-exe.git
+git branch -M main
+git push -u origin main
+
+```

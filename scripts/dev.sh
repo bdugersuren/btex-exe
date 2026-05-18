@@ -13,7 +13,8 @@ docker compose -f docker-compose.dev.yml ps
 
 echo ""
 echo "  Апп   → http://localhost:3000"
-echo "  DB    → localhost:5432"
+echo "  DB    → localhost:5433"
+echo "  Redis → localhost:6380"
 echo ""
 echo "  Лог харах : ./scripts/logs.sh dev"
 echo "  Зогсоох   : ./scripts/stop.sh dev"
