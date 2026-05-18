@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900 antialiased;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+}
+
+/* HTML table styling inside markdown */
+.markdown-body table {
+  @apply min-w-full border-collapse text-sm mb-3;
+}
+.markdown-body table th {
+  @apply border border-gray-200 px-3 py-1.5 bg-gray-50 font-semibold text-left text-gray-700;
+}
+.markdown-body table td {
+  @apply border border-gray-200 px-3 py-1.5 text-gray-700;
+}
+.markdown-body table tr:nth-child(even) td {
+  @apply bg-gray-50/60;
+}
+.markdown-body table thead {
+  @apply bg-gray-100;
+}

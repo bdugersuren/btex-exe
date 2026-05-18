@@ -1,0 +1,95 @@
+
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: btec_db_dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: btec_evaluator_dev
+      POSTGRES_USER: btec_user
+      POSTGRES_PASSWORD: btec_password
+    ports:
+      - '5433:5432'
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U btec_user -d btec_evaluator_dev']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: btec_redis_dev
+    restart: unless-stopped
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru --save ""
+    ports:
+      - '6380:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+    container_name: btec_app_dev
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://btec_user:btec_password@db:5432/btec_evaluator_dev
+      NEXTAUTH_SECRET: dev-secret-change-in-production
+      NEXTAUTH_URL: http://localhost:3000
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: development
+    ports:
+      - '3000:3000'
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+      - storage_dev_data:/app/storage
+
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: tools
+    container_name: btec_migrate_dev
+    environment:
+      DATABASE_URL: postgresql://btec_user:btec_password@db:5432/btec_evaluator_dev
+    depends_on:
+      db:
+        condition: service_healthy
+    command: npx prisma migrate deploy
+    profiles:
+      - tools
+
+  seed:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: tools
+    container_name: btec_seed_dev
+    environment:
+      DATABASE_URL: postgresql://btec_user:btec_password@db:5432/btec_evaluator_dev
+    depends_on:
+      db:
+        condition: service_healthy
+    command: npm run db:seed
+    profiles:
+      - tools
+
+volumes:
+  postgres_dev_data:
+  storage_dev_data:
+  redis_dev_data:

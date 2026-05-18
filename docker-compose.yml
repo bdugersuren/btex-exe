@@ -1,0 +1,120 @@
+
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: btec_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-btec_evaluator}
+      POSTGRES_USER: ${POSTGRES_USER:-btec_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-btec_password}
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-btec_user} -d ${POSTGRES_DB:-btec_evaluator}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+
+  redis:
+    image: redis:7-alpine
+    container_name: btec_redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --save ""
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 300M
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: btec_app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-btec_user}:${POSTGRES_PASSWORD:-btec_password}@db:5432/${POSTGRES_DB:-btec_evaluator}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:80}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: production
+    expose:
+      - '3000'
+    volumes:
+      - storage_data:/app/storage
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          memory: 512M
+
+  nginx:
+    image: nginx:alpine
+    container_name: btec_nginx
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - '80:80'
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: tools
+    container_name: btec_migrate
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-btec_user}:${POSTGRES_PASSWORD:-btec_password}@db:5432/${POSTGRES_DB:-btec_evaluator}
+    depends_on:
+      db:
+        condition: service_healthy
+    command: npx prisma migrate deploy
+    profiles:
+      - tools
+
+  seed:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: tools
+    container_name: btec_seed
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-btec_user}:${POSTGRES_PASSWORD:-btec_password}@db:5432/${POSTGRES_DB:-btec_evaluator}
+    depends_on:
+      db:
+        condition: service_healthy
+    command: npm run db:seed
+    profiles:
+      - tools
+
+volumes:
+  postgres_data:
+  storage_data:
+  redis_data:
